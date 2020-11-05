@@ -1,1 +1,3 @@
-Sitemap:http://chenhuichao.com/sitemap.xml
+User-agent: *
+Disallow:
+Sitemap: https://www.miwoes.com/sitemap.xml
