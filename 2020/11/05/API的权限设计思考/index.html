@@ -1,0 +1,119 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="description" content="有叹集 | 我曾把脸贴伏于地面，闻过泥土的气息。"><title>Restful API的权限设计思考 | 有叹集</title><link rel="stylesheet" type="text/css" href="/css/style.css?v=1.0.0"><link rel="stylesheet" type="text/css" href="https://unpkg.com/normalize.css"><link rel="stylesheet" type="text/css" href="https://unpkg.com/purecss/build/pure-min.css"><link rel="stylesheet" type="text/css" href="https://unpkg.com/purecss/build/grids-responsive-min.css"><link rel="stylesheet" href="https://unpkg.com/font-awesome@4.7.0/css/font-awesome.min.css"><script type="text/javascript" src="https://unpkg.com/jquery/dist/jquery.min.js"></script><link rel="icon" mask="" sizes="any" href="/favicon.ico"><link rel="Shortcut Icon" type="image/x-icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png"><link rel="alternate" type="application/atom+xml" href="/atom.xml"><script type="text/javascript" src="https://unpkg.com/clipboard/dist/clipboard.min.js"></script><script type="text/javascript" src="https://unpkg.com/toastr/build/toastr.min.js"></script><link rel="stylesheet" href="https://unpkg.com/toastr/build/toastr.min.css"><meta name="generator" content="Hexo 5.4.2"></head><body><div class="body_container"><div id="header"><div class="site-name"><h1 class="hidden">Restful API的权限设计思考</h1><a id="logo" href="/.">有叹集</a><p class="description">我曾把脸贴伏于地面，闻过泥土的气息。</p></div><div id="nav-menu"><a class="current" href="/."><i class="fa fa-home"> 首页</i></a><a href="/archives/"><i class="fa fa-archive"> 归档</i></a><a href="/about/"><i class="fa fa-user"> 关于</i></a><a href="/atom.xml"><i class="fa fa-rss"> 订阅</i></a></div></div><div class="pure-g" id="layout"><div class="pure-u-1 pure-u-md-3-4"><div class="content_container"><div class="post"><h1 class="post-title">Restful API的权限设计思考</h1><div class="post-meta">2020-11-05<span> | </span><span class="category"><a href="/categories/%E6%8A%80%E6%9C%AF/">技术</a></span></div><div class="post-content"><h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>基于Restful风格的API设计规范已经被广泛接受。鄙公司也不例外，我们的系统基于Micro Service的理念，各个Services（服务）将功能发布为遵循Restful风格的API，每个服务即成为可对外发布的独立单元，服务之间的组合又可成为新的服务，称为BaaS（Back-end as a Service)。</p>
+<p>由于各个服务需要单独对外提供服务，并且各个服务之间的业务差别比较大，所以在如何控制资源的权限，确保资源不被意外篡改和非法获取，又不违反Micro-Service的理念（单一业务职责）成为每个服务都要考虑的问题，即如何在开放和安全上做到平衡。</p>
+<h3 id="基本结构"><a href="#基本结构" class="headerlink" title="基本结构"></a>基本结构</h3><p>我们总结下来，基本原则当然是遵循Restful规范 （为什么必须遵循Restful规范？如果这是个问题的话，请参考：<a target="_blank" rel="noopener" href="http://stackoverflow.com/questions/1368014/why-do-we-need-restful-web-services">http://stackoverflow.com/questions/1368014/why-do-we-need-restful-web-services</a> ）。</p>
+<p>由于功能API都遵循Restful，所以我们把权限的分为如下几种：</p>
+<ul>
+<li><p>读：GET</p>
+</li>
+<li><p>写：PUT</p>
+</li>
+<li><p>新建：POST</p>
+</li>
+<li><p>删除：DELETE</p>
+</li>
+<li><p>获得元信息：HEAD</p>
+</li>
+<li><p>获得对该资源的可用操作：OPTIONS</p>
+</li>
+</ul>
+<p>基于这样的设计，我们把权限信息设计为这样的json结构：</p>
+<p>目标：resource/_permissions 内容：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;GET&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">        <span class="attr">&quot;user&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">            <span class="string">&quot;user1&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="string">&quot;user2&quot;</span></span><br><span class="line">        <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;role&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">           <span class="string">&quot;role1&quot;</span><span class="punctuation">,</span></span><br><span class="line">           <span class="string">&quot;role2&quot;</span></span><br><span class="line">        <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;group&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">            <span class="string">&quot;group1&quot;</span><span class="punctuation">,</span></span><br><span class="line">            <span class="string">&quot;group2&quot;</span></span><br><span class="line">        <span class="punctuation">]</span></span><br><span class="line">    <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;PUT&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">        <span class="attr">&quot;user&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">            <span class="string">&quot;user1&quot;</span></span><br><span class="line">        <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;role&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">            <span class="string">&quot;role1&quot;</span></span><br><span class="line">        <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;group&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">            <span class="string">&quot;group1&quot;</span></span><br><span class="line">        <span class="punctuation">]</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+<p>上述的权限设置可以绑定的不同层级的资源上，可以实现对不同租户、不同粒度的资源控制。 然而，这样的设计并不能解决所有问题，下面几个内容是我在工作中遇到的问题以及解决这些问题提的一些思路和实践。</p>
+<p>问题1：面向用户还是面向资源？<br>面向用户的权限通常围绕用户的三级进行权限分配：企业（租户），组、角色等。这种方案描述的是</p>
+<p><code>”用户拥有哪些资源的权限“</code><br>典型的权限信息如下：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">/user/<span class="number">123</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="string">&quot;user&quot;</span>: &#123;</span><br><span class="line">    <span class="string">&quot;ID&quot;</span>: <span class="string">&quot;123&quot;</span>,</span><br><span class="line">    <span class="string">&quot;name&quot;</span>: <span class="string">&quot;abc&quot;</span>,</span><br><span class="line">    <span class="string">&quot;permissions&quot;</span>: [</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="string">&quot;GET&quot;</span>: <span class="string">&quot;/product/&#123;id&#125;&quot;</span></span><br><span class="line">      &#125;,</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="string">&quot;PUT&quot;</span>: <span class="string">&quot;/product/&#123;id&#125;&quot;</span></span><br><span class="line">      &#125;</span><br><span class="line">    ]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+<p>而面向资源的权限则将权限信息直接分配给(Attach to)了一个资源，即通常说的ACL （Access Control List），他描述的是：</p>
+<p><code>”资源可以被哪些用户访问“</code><br>两种方案的主要区别在于权限信息分别散落在：</p>
+<ul>
+<li><p>各个用户上</p>
+</li>
+<li><p>各个资源上</p>
+</li>
+</ul>
+<p>在基于Micro-Services的架构里，帐号信息通常由专门的服务维护，如果将权限定义为面向用户，意味着用户信息和权限信息有映射关系，而这种关系自然成为帐号服务需要维护的内容。但不同的业务服务有不同的权限类型（GET/PUT/DELETE/POST之外还有许多类型，下文会专门阐述）、资源类型、权限粒度，一个集中的服务很难维护权限信息的全集和变更。</p>
+<p>而如果将权限信息与资源绑定，则可以针对不同的资源类型设置不同的权限类型和权限粒度，比如对产品信息，除了基本的增删查改之外，还可以进行“搜索”操作，所以可以在“产品”资源下，增加“Search”的权限类型。</p>
+<p>然而，面向资源的权限方案存在粒度过细，维护困难的问题，所以许多系统在此基础上增加了“Policy”的概念，可以简化权限设置。比如Amazon的S3，除了提供ACL，还引入Policy的概念。</p>
+<p>Policy不需要特别指定哪些资源对哪些用户开放，只需根据通常的业务模式，划分成如下的几类：</p>
+<ul>
+<li>Private: Only Owner (usually creator) have permissions to a resource.</li>
+<li>Public: Other user have permission (read,write) to a resource</li>
+<li>Public_Read:所有用户可读</li>
+<li>Public_Write:所有用户可写</li>
+<li>Owner_Full_Control：资源创建者拥有全部权限</li>
+</ul>
+<p>可以说，面向资源的ACL加上面向资源的Policy，为解决Restful风格的API权限问题提供了一个优良的基础。</p>
+<h3 id="问题2：何时需要一个新的权限类型？"><a href="#问题2：何时需要一个新的权限类型？" class="headerlink" title="问题2：何时需要一个新的权限类型？"></a>问题2：何时需要一个新的权限类型？</h3><p>上文提到对一个GET权限对应于资源的读取操作，那么如果对”/product“的这样的资源类型（目录？）的GET权限，具体对应业务系统的什么操作呢？</p>
+<ul>
+<li>1）该资源类型下的所有对象的读权限</li>
+<li>2）该资源类型的相关属性的读取权限</li>
+<li>3）列出该资源类型下的所有ID</li>
+</ul>
+<p>根据HTTP的标准做法似乎是第三种操作（这也是Amazon S3的做法），但我认为第一种做法却更方便些，可以实现权限的层级结构，简化权限设置。即可以不对”/product“下的所有资源都分别设置GET权限，而只设置”product“的GET权限表示product下各个资源的GET权限。</p>
+<p>而对方案1和2种的中的两种操作的权限控制则需要增加新的权限类型：</p>
+<ul>
+<li>Property</li>
+<li>List</li>
+</ul>
+<p>这里列说我们所有的权限类型： 元操作：</p>
+<ul>
+<li>GET</li>
+<li>PUT</li>
+<li>POST</li>
+<li>DELETE</li>
+<li>List</li>
+<li>Search</li>
+<li>Run</li>
+</ul>
+<h3 id="问题3：Sub-Resource还是Another-Resource"><a href="#问题3：Sub-Resource还是Another-Resource" class="headerlink" title="问题3：Sub-Resource还是Another Resource"></a>问题3：Sub-Resource还是Another Resource</h3><p>上文提到权限信息最好跟资源绑定，比如，对一个资源 /product/123，有一个专门的信息表述该资源的权限信息，该信息本身也是一种资源，那么如何定义该资源的访问路径呢？一般来说，可以通过以下两种路径来定位</p>
+<ul>
+<li>/product/123/_permissions</li>
+<li>/permissions/product/123</li>
+</ul>
+<p>前一种是将权限信息视为产品信息的子资源，而后一种则将权限信息视为一种独立的资源，资源路径里包含产品路径只是作为维护“资源-权限”的映射关系的纽带。 在我们的实践里，通常采用第一种方案，即将包括权限信息在内的其他信息视为产品资源的子资源，这些信息包括：</p>
+<ul>
+<li>_properties: 属性</li>
+<li>_configuration：配置</li>
+<li>_permissions：权限</li>
+</ul>
+<h3 id="问题4：是资源还是动作"><a href="#问题4：是资源还是动作" class="headerlink" title="问题4：是资源还是动作"></a>问题4：是资源还是动作</h3><p>问题2提到了几种非标准的HTTP Method的元操作类型：如RUN，Search、List，这些操作并不能直接对应到真实的HTTP method上，即对一个资源的GET操作可以是这样的：</p>
+<p><code>GET /resource/id</code><br>而对一类资源（类型）的搜索操作却不能这样：</p>
+<p><code>SEARCH /resource/</code><br>因为没有Search这个http method （虽然<a target="_blank" rel="noopener" href="https://datatracker.ietf.org/doc/rfc5323/">https://datatracker.ietf.org/doc/rfc5323/</a> 中说明Search也是一个http method)。</p>
+<p>目前我们的做法是将这样的操作（动作）转为一个下划线开头的路径（类似子资源），比如搜索操作转变为这样：</p>
+<p><code>GET /resource/id/_search</code><br>或</p>
+<p><code>POST /resource/_search</code><br>虽然可以说Search也算http method，但是却并不是所以的软件、设备都支持，所以另外一个方案是采用X-HTTP-Method-Override的方法。 比如下面的请求</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">GET /resource/</span><br><span class="line">X-HTTP-Method-Override:Search</span><br></pre></td></tr></table></figure>
+
+
+<p>表示对/resource资源的search操作。（在spring中有HiddenHttpMethodFilter，可以根据头信息修改客户端的原始HttpMethod）。</p>
+<h3 id="问题5：选哪条路径"><a href="#问题5：选哪条路径" class="headerlink" title="问题5：选哪条路径"></a>问题5：选哪条路径</h3><p>当一个实体（一个资源）可以有多条路径到达时，对外的API应该选用哪条路径？这直接关系到权限控制是否有漏洞，比如权限设置某资源不能被用户访问，但用户却可以通过另外一个URL路径访问到该资源。</p>
+<p>比如权限设置规定用户不能访问：</p>
+<p><code>/review/&#123;reviewId&#125;</code><br>但有可能用户可以通过如下路径访问同一个资源：</p>
+<p><code>/product/&#123;productId&#125;/review/&#123;reviewId&#125;</code><br>类似的问题还有：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">/enterpriseId/user/userId</span><br><span class="line">/enterpriseId/group/groupId/user/userId</span><br><span class="line">/enterpriseId/role/roleId/user/userId</span><br></pre></td></tr></table></figure>
+
+
+<p>由于面向资源的权限设置的局限性，同一个实际资源，由不同的url表示时，即认为是不同的资源，也即可以拥有不同的权限，所以要控制不同路径的资源的权限设置的一致性，最简单的办法是在API层面只发布一个路径。而如何在这些路径中选择一个合适的路径问题并没有统一的答案，需要根据实际情况灵活处理，但是有几个原则可以参考：</p>
+<ul>
+<li>原则一： 是否有从属关系：user和role，group之间，并没有硬性的从属关系，一个用户可以没有group或者role而存在。</li>
+<li>原则三： 云平台的多租户特性。enterprise的隔离性</li>
+<li>原则二： 简单，开发友好、测试友好，用户友好</li>
+</ul>
+<p>比如上述问题的用户信息，由于用户和组或角色之间并没有从属关系，所以建议以用户信息为根路径为好。</p>
+<h3 id="问题6：当一个操作涉及到多个资源时，如何控制权限？（跨资源操作）"><a href="#问题6：当一个操作涉及到多个资源时，如何控制权限？（跨资源操作）" class="headerlink" title="问题6：当一个操作涉及到多个资源时，如何控制权限？（跨资源操作）"></a>问题6：当一个操作涉及到多个资源时，如何控制权限？（跨资源操作）</h3><p>目前为止，权限信息与一个或一类资源绑定，并没有提到涉及到多个资源的操作的权限控制。典型的跨资源操作如：拷贝, 批量删除多个资源。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">delete /resourceType/id1,id2,id3</span><br><span class="line">copy /resourceType/source?to=resourceType/target </span><br></pre></td></tr></table></figure>
+
+
+<p>这个时候Restful的弱点开始显现，因为这类问题是一个业务处理，而不是访问一个资源。但是也有一个折中的办法：</p>
+<p>由于copy是一个不常用的、不被广泛支持的的http method，所以可以认为这个操作可以可以分解为：</p>
+<p><code>对原资源的读取操作 (GET) +目的资源的写入操作 (PUT)</code><br>权限控制器需要分别判断两个资源的相应权限。</p>
+<p>当然，如果需要更精细的控制的话，应该有单独的COPY操作，因为除了基本的读和写操作之外，复制的另一个含义是服务器端代替客户端执行读和写操作，比一般的由客户端发起的读写操作更复杂，更占用系统资源。在一般的系统中可以忽略这个问题。</p>
+<p>所以从权限设置的角度来说，这类操作应该由多个操作组合而来。</p>
+<h3 id="问题7：如何处理同一个资源的同一类操作的不同方式的权限问题"><a href="#问题7：如何处理同一个资源的同一类操作的不同方式的权限问题" class="headerlink" title="问题7：如何处理同一个资源的同一类操作的不同方式的权限问题"></a>问题7：如何处理同一个资源的同一类操作的不同方式的权限问题</h3><p>我最近在一个文件存储服务的设计中碰到的一个问题： 新建（上传）一个文件通过POST方法实现，对应的操作权限也为POST，但是新上传一个文件还有另外一个方式，即新建一个上传任务，并将待上传文件分块上传，最后提交任务完成上传。</p>
+<p>这里一个矛盾在于，从理论上来说，一个上传任务也是一个资源，他也有 POST/PUT/DELETE的操作，他的权限应该是独立于对一个资源操作的权限的，但实际上他们却相互关联，只有对一个文件有POST或PUT权限，才能新建一个上传job，并且更新这个job，最后提交这个job；</p>
+<p>为了免去维护文件操作权限和文件上传任务权限之间的一致性，目前的方案是： 将上传job的三步视为上传操作的三个子操作，他们跟普通上传操作享有同样的权限、HTTP Method，即：不管是新建job、更新job、提交job，他们在API中对应的http method都为POST（新上传文件）或PUT（更新文件），这样就可以简单判断对文件的新建、更新权限来控制文件上传任务的权限。</p>
+<h3 id="结尾"><a href="#结尾" class="headerlink" title="结尾"></a>结尾</h3><p>除了上述的几个问题之外还有许多其他问题，都需要在方便和标准之间做一个平衡。</p>
+<p><em>原文： <a target="_blank" rel="noopener" href="http://gavinhuang.github.io/blog/permission-pattern-in-restful-paas/">http://gavinhuang.github.io/blog/permission-pattern-in-restful-paas/ </a></em></p>
+</div><div class="tags"><ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E7%BC%96%E7%A8%8B/" rel="tag">编程</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%AE%BE%E8%AE%A1/" rel="tag">设计</a></li></ul></div><div class="post-nav"><a class="pre" href="/2020/11/07/%E5%8F%8D%E5%8F%9B%E7%9A%84%E9%B2%81%E9%B2%81%E4%BF%AE/">反叛的鲁鲁修</a><a class="next" href="/2020/11/03/%E9%87%87%E6%A0%BC/%E6%82%B2%E6%AC%A2%E4%B9%8B%E6%AD%8C/">悲欢之歌</a></div></div></div></div><div class="pure-u-1-4 hidden_mid_and_down"><div id="sidebar"><div class="widget"><form class="search-form" action="//www.google.com/search" method="get" accept-charset="utf-8" target="_blank"><input type="text" name="q" maxlength="20" placeholder="Search"/><input type="hidden" name="sitesearch" value="https://www.miwoes.com"/></form></div><div class="widget"><div class="author-info"><a class="info-avatar" href="/about/" title="关于"><img class="nofancybox" src="/img/avatar.jpeg"/></a><p>博。三尺微命,一介书生！</p><a class="info-icon" href="https://twitter.com/miwoes" title="Twitter" target="_blank" style="margin-inline:5px"> <i class="fa fa-twitter-square" style="margin-inline:5px"></i></a><a class="info-icon" href="mailto:miwoes@163.com" title="Email" target="_blank" style="margin-inline:5px"> <i class="fa fa-envelope-square" style="margin-inline:5px"></i></a><a class="info-icon" href="https://github.com/miwoy" title="Github" target="_blank" style="margin-inline:5px"> <i class="fa fa-github-square" style="margin-inline:5px"></i></a><a class="info-icon" href="/atom.xml" title="RSS" target="_blank" style="margin-inline:5px"> <i class="fa fa-rss-square" style="margin-inline:5px"></i></a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-folder-o"> 分类</i></div><ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/%E4%B8%87%E7%89%A9%E7%90%86%E8%AE%BA/">万物理论</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%8A%80%E6%9C%AF/">技术</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%96%87%E5%8C%96/">文化</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E8%87%AA%E7%9C%81%E8%A7%84/">自省规</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E8%AF%97%E6%AD%8C/">诗歌</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E9%87%87%E6%A0%BC/">采格</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E9%9A%8F%E7%AC%94/">随笔</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-star-o"> 标签</i></div><div class="tagcloud"><a href="/tags/%E5%AE%87%E5%AE%99%E7%9C%9F%E7%9B%B8/" style="font-size: 15px;">宇宙真相</a> <a href="/tags/%E5%8F%8D%E6%80%9D/" style="font-size: 15px;">反思</a> <a href="/tags/%E5%BF%83%E5%AD%A6/" style="font-size: 15px;">心学</a> <a href="/tags/%E6%84%9F%E6%82%9F/" style="font-size: 15px;">感悟</a> <a href="/tags/%E7%BB%8F%E6%B5%8E/" style="font-size: 15px;">经济</a> <a href="/tags/%E7%90%86%E5%AD%A6/" style="font-size: 15px;">理学</a> <a href="/tags/%E6%9A%97%E8%A7%89/" style="font-size: 15px;">暗觉</a> <a href="/tags/%E7%BC%96%E7%A8%8B/" style="font-size: 15px;">编程</a> <a href="/tags/%E8%AE%BE%E8%AE%A1/" style="font-size: 15px;">设计</a> <a href="/tags/%E5%8D%9A%E5%BC%88/" style="font-size: 15px;">博弈</a> <a href="/tags/%E8%9D%B4%E8%9D%B6%E6%95%88%E5%BA%94/" style="font-size: 15px;">蝴蝶效应</a> <a href="/tags/%E6%94%BF%E6%B2%BB/" style="font-size: 15px;">政治</a> <a href="/tags/%E7%83%AD%E8%A1%80/" style="font-size: 15px;">热血</a> <a href="/tags/%E8%B0%8B%E7%95%A5/" style="font-size: 15px;">谋略</a> <a href="/tags/%E5%8A%A8%E6%BC%AB/" style="font-size: 15px;">动漫</a> <a href="/tags/%E7%88%B1%E6%83%85/" style="font-size: 15px;">爱情</a> <a href="/tags/%E7%BE%8E%E5%AD%A6/" style="font-size: 15px;">美学</a> <a href="/tags/%E6%84%9F%E5%8F%97/" style="font-size: 15px;">感受</a> <a href="/tags/%E6%83%85%E7%BB%AA/" style="font-size: 15px;">情绪</a> <a href="/tags/%E6%98%8E%E8%A7%89/" style="font-size: 15px;">明觉</a> <a href="/tags/%E8%AE%B0%E5%BF%86/" style="font-size: 15px;">记忆</a> <a href="/tags/%E5%AD%A6%E4%B9%A0/" style="font-size: 15px;">学习</a> <a href="/tags/%E6%88%90%E9%95%BF/" style="font-size: 15px;">成长</a> <a href="/tags/%E5%85%89%E9%98%B4/" style="font-size: 15px;">光阴</a> <a href="/tags/%E5%88%86%E5%BD%A2/" style="font-size: 15px;">分形</a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-file-o"> 最近文章</i></div><ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2023/12/11/%E4%B8%96%E7%95%8C%E6%A8%A1%E5%9E%8B%E7%9A%84%E7%8C%9C%E6%B5%8B/">世界模型的猜测</a></li><li class="post-list-item"><a class="post-list-link" href="/2021/12/23/%E7%BB%8F%E6%B5%8E%E5%9B%BE%E6%99%AF/">经济图景</a></li><li class="post-list-item"><a class="post-list-link" href="/2021/04/21/%E8%87%AA%E7%9C%81%E8%A7%84/%E7%95%85%E6%80%80%E6%82%A6%E6%AD%8C/">畅怀阅歌</a></li><li class="post-list-item"><a class="post-list-link" href="/2021/03/30/%E6%96%87%E5%8C%96/%E8%B5%A4%E5%A3%81%E8%B5%8B/">赤壁赋</a></li><li class="post-list-item"><a class="post-list-link" href="/2021/03/30/%E8%87%AA%E7%9C%81%E8%A7%84/%E5%86%99%E4%B8%80%E5%86%99%E6%9C%80%E8%BF%91/">写一写最近</a></li><li class="post-list-item"><a class="post-list-link" href="/2021/03/30/%E6%96%87%E5%8C%96/%E5%8D%97%E9%95%87%E8%A7%82%E8%8A%B1/">南镇观花</a></li><li class="post-list-item"><a class="post-list-link" href="/2021/01/01/%E8%87%AA%E7%9C%81%E8%A7%84/%E9%80%86%E6%B5%81%E5%A6%82%E6%BD%AE/">逆流如潮</a></li><li class="post-list-item"><a class="post-list-link" href="/2020/11/25/%E9%87%87%E6%A0%BC/%E6%BC%AB%E6%AD%A5%E6%97%B6%E9%92%9F/">漫步时钟</a></li><li class="post-list-item"><a class="post-list-link" href="/2020/11/18/%E8%AF%97/%E4%B8%8D%E8%AF%B7/">不请</a></li><li class="post-list-item"><a class="post-list-link" href="/2020/11/08/%E5%85%B3%E4%BA%8E%E5%BF%AB%E9%80%92%E5%91%98%E4%B8%8D%E9%80%81%E8%B4%A7%E4%B8%8A%E9%97%A8%E7%9A%84%E9%97%AE%E9%A2%98%E6%A0%B9%E6%BA%90%E4%B8%8E%E5%8A%9E%E6%B3%95/">关于快递员不送货上门的问题根源与办法</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-external-link"> 友情链接</i></div></div></div></div><div class="pure-u-1 pure-u-md-3-4"><div id="footer">Copyright © 2025 <a href="/." rel="nofollow">有叹集.</a> Powered by<a rel="nofollow" target="_blank" href="https://hexo.io"> Hexo.</a><a rel="nofollow" target="_blank" href="https://github.com/tufu9441/maupassant-hexo"> Theme</a> by<a rel="nofollow" target="_blank" href="https://github.com/pagecho"> Cho.</a></div></div></div><a class="show" id="rocket" href="#top"></a><script type="text/javascript" src="/js/totop.js?v=1.0.0" async></script><script type="text/javascript" src="https://unpkg.com/@fancyapps/fancybox/dist/jquery.fancybox.min.js" async></script><script type="text/javascript" src="/js/fancybox.js?v=1.0.0" async></script><link rel="stylesheet" type="text/css" href="https://unpkg.com/@fancyapps/fancybox/dist/jquery.fancybox.min.css"><script type="text/javascript" src="/js/copycode.js?v=1.0.0" successtext="复制成功！"></script><link rel="stylesheet" type="text/css" href="/css/copycode.css?v=1.0.0"><script type="text/javascript" src="/js/codeblock-resizer.js?v=1.0.0"></script><script type="text/javascript" src="/js/smartresize.js?v=1.0.0"></script></div></body></html>
